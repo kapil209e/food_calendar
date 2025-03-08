@@ -3,7 +3,7 @@ import { Meal, MealType, Region, SpiceLevel, CookingMedium, FastingMeal } from '
 import { v4 as uuidv4 } from 'uuid';
 
 // Check if API key is available
-const HUGGINGFACE_API_KEY = process.env.NEXT_PUBLIC_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
+const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
 // Initialize Hugging Face client if API key is available
 let hf: HfInference | null = null;
