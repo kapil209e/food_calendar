@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog } from '@headlessui/react';
 import { Meal, MealOrFasting, FastingMeal, MealType } from '../lib/meals/types';
 import { sampleMeals, sampleFastingMeals } from '../lib/meals/aiMealGenerator';
@@ -28,29 +28,7 @@ export default function MealSelectionModal({
   const [isLoading, setIsLoading] = useState(false);
   const [meals, setMeals] = useState<Meal[]>([]);
 
-  // Load initial meals when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      regenerateMeals();
-    }
-  }, [isOpen, mealType]);
-
-  // Get meals for the current meal type
-  const mealsForType = meals.length > 0 ? meals : [];
-  
-  const regularMeals = mealsForType.filter((meal: Meal) => 
-    searchTerm === '' || 
-    meal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    meal.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const fastingOptions = sampleFastingMeals.filter((meal: FastingMeal) =>
-    searchTerm === '' || 
-    meal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    meal.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const regenerateMeals = async () => {
+  const regenerateMeals = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch('/api/meals/generate', {
@@ -85,7 +63,29 @@ export default function MealSelectionModal({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [mealType]);
+
+  // Load initial meals when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      regenerateMeals();
+    }
+  }, [isOpen, regenerateMeals]);
+
+  // Get meals for the current meal type
+  const mealsForType = meals.length > 0 ? meals : [];
+  
+  const regularMeals = mealsForType.filter((meal: Meal) => 
+    searchTerm === '' || 
+    meal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    meal.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const fastingOptions = sampleFastingMeals.filter((meal: FastingMeal) =>
+    searchTerm === '' || 
+    meal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    meal.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Dialog

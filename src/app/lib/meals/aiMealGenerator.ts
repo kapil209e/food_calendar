@@ -3,13 +3,36 @@ import { Meal, MealType, Region, SpiceLevel, CookingMedium, FastingMeal } from '
 import { v4 as uuidv4 } from 'uuid';
 
 // Check if API key is available
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
+const HUGGINGFACE_API_KEY = process.env.NEXT_PUBLIC_HUGGINGFACE_API_KEY || process.env.HUGGINGFACE_API_KEY;
 
 // Initialize Hugging Face client if API key is available
-const hf = HUGGINGFACE_API_KEY ? new HfInference(HUGGINGFACE_API_KEY) : null;
+let hf: HfInference | null = null;
+try {
+  if (HUGGINGFACE_API_KEY) {
+    hf = new HfInference(HUGGINGFACE_API_KEY);
+    console.log('Hugging Face client initialized successfully');
+  } else {
+    console.warn('No Hugging Face API key found, will use sample meals');
+  }
+} catch (error) {
+  console.error('Error initializing Hugging Face client:', error);
+  hf = null;
+}
 
 // Using a more reliable model for structured text generation
 const MODEL_NAME = "tiiuae/falcon-7b-instruct";
+
+// Add caching for generated meals
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
+const mealCache = new Map<MealType, { meals: Meal[], timestamp: number }>();
+
+const getCachedMeals = (mealType: MealType) => {
+  const cached = mealCache.get(mealType);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.meals;
+  }
+  return null;
+};
 
 // Track used meal names to prevent duplicates
 const usedMealNames = new Set<string>();
@@ -622,6 +645,7 @@ export async function generateMeal(
         do_sample: true,
         return_full_text: false,
       },
+      accessToken: HUGGINGFACE_API_KEY,
     });
 
     console.log('Raw AI response:', response.generated_text);
@@ -706,51 +730,55 @@ export async function generateMultipleMeals(
 ): Promise<Meal[]> {
   console.log(`Generating ${count} ${mealType} meals${region ? ` from ${region}` : ''}`);
   
+  // Check cache first
+  const cachedMeals = getCachedMeals(mealType);
+  if (cachedMeals) {
+    console.log('Using cached meals');
+    return cachedMeals.slice(0, count);
+  }
+
   // Reset used meals when starting a new generation
   const usedNames = new Set<string>();
   const meals: Meal[] = [];
-  const promises: Promise<Meal | null>[] = [];
 
-  // First try AI generation
+  // Try to get meals from sample first for immediate response
+  const initialMeals = [];
   for (let i = 0; i < count; i++) {
-    promises.push(generateMeal(mealType, region, usedNames));
+    const sampleMeal = getRandomSampleMeal(mealType, usedNames);
+    if (sampleMeal) {
+      initialMeals.push(sampleMeal);
+    }
   }
 
-  try {
-    const results = await Promise.allSettled(promises);
-    
-    // Process results and ensure we have enough unique meals
-    for (const result of results) {
-      if (result.status === 'fulfilled' && result.value) {
-        meals.push(result.value);
-      }
+  // Store in cache
+  mealCache.set(mealType, { meals: initialMeals, timestamp: Date.now() });
+
+  // Try AI generation in the background if API key is available
+  if (HUGGINGFACE_API_KEY && hf) {
+    const promises: Promise<Meal | null>[] = [];
+    for (let i = 0; i < count; i++) {
+      promises.push(generateMeal(mealType, region, usedNames));
     }
 
-    // If we don't have enough meals, try to fill with unused sample meals
-    while (meals.length < count) {
-      const sampleMeal = getRandomSampleMeal(mealType, usedNames);
-      if (!sampleMeal) {
-        // If we've used all available meals, break
-        break;
+    try {
+      const results = await Promise.allSettled(promises);
+      const aiMeals: Meal[] = [];
+      
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          aiMeals.push(result.value);
+        }
       }
-      meals.push(sampleMeal);
-    }
 
-    console.log(`Successfully generated ${meals.length} unique meals`);
-    return meals;
-  } catch (error) {
-    console.error('Error generating multiple meals:', error);
-    
-    // Fallback to unique sample meals
-    const fallbackMeals: Meal[] = [];
-    while (fallbackMeals.length < count) {
-      const sampleMeal = getRandomSampleMeal(mealType, usedNames);
-      if (!sampleMeal) {
-        // If we've used all available meals, break
-        break;
+      if (aiMeals.length > 0) {
+        // Update cache with AI-generated meals
+        mealCache.set(mealType, { meals: aiMeals, timestamp: Date.now() });
+        return aiMeals;
       }
-      fallbackMeals.push(sampleMeal);
+    } catch (error) {
+      console.error('Error generating AI meals:', error);
     }
-    return fallbackMeals;
   }
+
+  return initialMeals;
 } 
