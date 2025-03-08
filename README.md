@@ -9,6 +9,8 @@ A Next.js application to help plan your Indian meals for the week. Features incl
 - Nutritional information for each meal
 - Support for breakfast, lunch, and dinner options
 
+Visit the live site: [Indian Meal Planner](https://food-calendar.vercel.app)
+
 ## Tech Stack
 
 - Next.js 14 (App Router)
@@ -20,8 +22,8 @@ A Next.js application to help plan your Indian meals for the week. Features incl
 
 1. Clone the repository
 ```bash
-git clone [your-repo-url]
-cd meal-planner
+git clone https://github.com/kapil209e/food_calendar.git
+cd food_calendar
 ```
 
 2. Install dependencies
