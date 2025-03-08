@@ -60,10 +60,24 @@ export async function getRandomMeals(
 ): Promise<Meal[]> {
   console.log('getRandomMeals called with:', { mealType, preferences, count, useAI });
 
+  // Ensure mealType is lowercase
+  const normalizedMealType = mealType.toLowerCase() as MealType;
+  console.log('Normalized meal type:', normalizedMealType);
+
   // Get meals of the specified type from database
-  const mealsOfType = mealDatabase[mealType];
-  console.log(`Found ${mealsOfType.length} ${mealType} meals in database`);
+  const mealsOfType = mealDatabase[normalizedMealType];
+  console.log(`Found ${mealsOfType?.length || 0} ${normalizedMealType} meals in database`);
   
+  if (!mealsOfType || mealsOfType.length === 0) {
+    console.log('No meals found in database for type:', normalizedMealType);
+    // Try AI generation if no meals found
+    if (useAI) {
+      console.log('Attempting AI generation due to no meals in database');
+      return generateMultipleMeals(normalizedMealType, count);
+    }
+    return [];
+  }
+
   // Filter by preferences
   const filteredMeals = filterMealsByPreferences(mealsOfType, preferences);
   console.log(`${filteredMeals.length} meals match preferences`);
@@ -89,7 +103,7 @@ export async function getRandomMeals(
     console.log('Attempting AI meal generation');
     try {
       const aiMeals = await generateMultipleMeals(
-        mealType,
+        normalizedMealType,
         count,
         preferences.region?.[0]
       );

@@ -1,185 +1,209 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Meal, MealPreferences, MealType } from '../lib/meals/types';
-import { X, Sparkles } from 'lucide-react';
+import { Dialog } from '@headlessui/react';
+import { Meal, MealOrFasting, FastingMeal, MealType } from '../lib/meals/types';
+import { sampleMeals, sampleFastingMeals } from '../lib/meals/aiMealGenerator';
+import { X, Utensils, Droplet, RefreshCw } from 'lucide-react';
 
 interface MealSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (meal: Meal) => void;
-  mealType: MealType;
+  onSelectMeal: (meal: MealOrFasting) => void;
   day: string;
+  mealType: MealType;
 }
 
-const defaultPreferences: MealPreferences = {
-  isVegetarian: true,
-  hasOnionGarlic: true,
-  cookingMedium: ['ghee', 'oil'],
-  spiceLevel: 'medium',
-};
+type Tab = 'meals' | 'fasting';
 
 export default function MealSelectionModal({
   isOpen,
   onClose,
-  onSelect,
-  mealType,
+  onSelectMeal,
   day,
+  mealType,
 }: MealSelectionModalProps) {
-  const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<Meal[]>([]);
-  const [error, setError] = useState('');
-  const [useAI, setUseAI] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>('meals');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [meals, setMeals] = useState<Meal[]>([]);
 
-  async function generateSuggestions() {
-    setLoading(true);
-    setError('');
+  // Load initial meals when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      regenerateMeals();
+    }
+  }, [isOpen, mealType]);
+
+  // Get meals for the current meal type
+  const mealsForType = meals.length > 0 ? meals : [];
+  
+  const regularMeals = mealsForType.filter((meal: Meal) => 
+    searchTerm === '' || 
+    meal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    meal.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const fastingOptions = sampleFastingMeals.filter((meal: FastingMeal) =>
+    searchTerm === '' || 
+    meal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    meal.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const regenerateMeals = async () => {
     try {
+      setIsLoading(true);
       const response = await fetch('/api/meals/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          mealType,
-          preferences: defaultPreferences,
-          useAI,
+          mealType: mealType,
+          preferences: {
+            isVegetarian: true,
+            hasOnionGarlic: true,
+            cookingMedium: ['oil', 'ghee'],
+            spiceLevel: 'medium',
+            region: [],
+            healthPreferences: []
+          },
+          useAI: true
         }),
       });
 
-      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate meals');
+        throw new Error('Failed to fetch meals');
       }
 
-      setSuggestions(data.meals);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
+      const data = await response.json();
+      setMeals(data.meals || []);
+    } catch (error) {
+      console.error('Error regenerating meals:', error);
+      // Fallback to sample meals if API fails
+      setMeals(sampleMeals[mealType] || []);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }
-
-  // Generate suggestions when modal opens or when AI toggle changes
-  useEffect(() => {
-    if (isOpen) {
-      generateSuggestions();
-    }
-  }, [isOpen, useAI]);
-
-  if (!isOpen) return null;
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-        >
-          <X size={24} />
-        </button>
-
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">
-            Select {mealType} for {day}
-          </h2>
-          <button
-            onClick={() => setUseAI(!useAI)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-              useAI 
-                ? 'bg-emerald-100 text-emerald-800' 
-                : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            <Sparkles size={16} />
-            AI Suggestions {useAI ? 'On' : 'Off'}
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-            {error}
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      className="fixed inset-0 z-50 overflow-y-auto"
+    >
+      <div className="fixed inset-0 bg-black bg-opacity-30" aria-hidden="true" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Dialog.Panel className="relative bg-white rounded-lg max-w-2xl w-full mx-4 shadow-xl">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b">
+            <Dialog.Title className="text-lg font-semibold text-gray-900">
+              Select {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+            </Dialog.Title>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-500"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-        )}
 
-        <div className="space-y-4">
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">
-                {useAI ? 'Generating AI suggestions...' : 'Loading suggestions...'}
-              </p>
+          {/* Content */}
+          <div className="p-4">
+            {/* Tabs */}
+            <div className="flex space-x-4 mb-4">
+              <button
+                onClick={() => setActiveTab('meals')}
+                className={`flex items-center px-4 py-2 rounded-md ${
+                  activeTab === 'meals'
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Utensils className="h-4 w-4 mr-2" />
+                Meals
+              </button>
+              <button
+                onClick={() => setActiveTab('fasting')}
+                className={`flex items-center px-4 py-2 rounded-md ${
+                  activeTab === 'fasting'
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Droplet className="h-4 w-4 mr-2" />
+                Fasting
+              </button>
             </div>
-          ) : (
-            <>
-              {suggestions.length === 0 ? (
-                <div className="text-center py-8 text-gray-600">
-                  No meals found matching your preferences. Try adjusting your preferences or enabling AI suggestions.
-                </div>
+
+            {/* Search and Refresh */}
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Search meals..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                onClick={regenerateMeals}
+                disabled={isLoading}
+                className="px-4 py-2 bg-emerald-500 text-white rounded-md hover:bg-emerald-600 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {/* Meal List */}
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {activeTab === 'meals' ? (
+                regularMeals.length > 0 ? (
+                  regularMeals.map((meal) => (
+                    <button
+                      key={meal.id}
+                      onClick={() => {
+                        onSelectMeal(meal);
+                        onClose();
+                      }}
+                      className="w-full p-4 text-left border rounded-lg hover:border-emerald-500 hover:shadow-md transition-all group"
+                    >
+                      <h3 className="font-medium text-gray-900 group-hover:text-emerald-600">
+                        {meal.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {meal.description}
+                      </p>
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 py-4">
+                    No meals found. Try regenerating or adjusting your search.
+                  </p>
+                )
               ) : (
-                suggestions.map((meal) => (
-                  <div
-                    key={meal.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                fastingOptions.map((option) => (
+                  <button
+                    key={option.id}
                     onClick={() => {
-                      onSelect(meal);
+                      onSelectMeal(option);
                       onClose();
                     }}
+                    className="w-full p-4 text-left border rounded-lg hover:border-emerald-500 hover:shadow-md transition-all group"
                   >
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-lg">{meal.name}</h3>
-                      {meal.id.startsWith('ai-') && (
-                        <span className="flex items-center gap-1 text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
-                          <Sparkles size={12} />
-                          AI Generated
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="text-sm bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
-                        {meal.cookingTime} mins
-                      </span>
-                      <span className="text-sm bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
-                        {meal.region}
-                      </span>
-                      <span className="text-sm bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
-                        {meal.spiceLevel}
-                      </span>
-                    </div>
-                    {meal.healthTags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {meal.healthTags.map((tag, index) => (
-                          <span
-                            key={index}
-                            className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                    <h3 className="font-medium text-gray-900 group-hover:text-emerald-600">
+                      {option.name}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {option.description}
+                    </p>
+                  </button>
                 ))
               )}
-            </>
-          )}
-        </div>
-
-        <div className="mt-6 flex justify-between items-center">
-          <button
-            onClick={generateSuggestions}
-            disabled={loading}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {loading ? 'Generating...' : 'Generate More Suggestions'}
-          </button>
-          
-          <div className="text-sm text-gray-500">
-            {suggestions.length > 0 && `${suggestions.length} suggestions available`}
+            </div>
           </div>
-        </div>
+        </Dialog.Panel>
       </div>
-    </div>
+    </Dialog>
   );
 } 

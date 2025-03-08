@@ -1,12 +1,14 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { AuthProvider } from '../lib/contexts/AuthContext';
+import AppLayout from './components/AppLayout';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Meal Planner",
-  description: "Plan your meals for the week with ease",
+  title: 'Meal Planner',
+  description: 'Plan your meals with ease',
 };
 
 export default function RootLayout({
@@ -16,10 +18,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-gray-50 text-gray-900 min-h-screen`}>
-        <main className="container mx-auto px-4 py-8">
-          {children}
-        </main>
+      <body className={inter.className}>
+        <AuthProvider>
+          <AppLayout>{children}</AppLayout>
+        </AuthProvider>
       </body>
     </html>
   );

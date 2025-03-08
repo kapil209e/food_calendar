@@ -5,16 +5,37 @@ import { getRandomMeals } from "@/app/lib/meals/mealSelector";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log('Raw request body:', body);
+
     const { mealType, preferences, useAI = true } = body as {
       mealType: MealType;
       preferences: MealPreferences;
       useAI?: boolean;
     };
 
-    console.log('API Request:', { mealType, preferences, useAI });
+    // Validate required fields
+    if (!mealType) {
+      console.error('Missing mealType in request');
+      return NextResponse.json(
+        { error: "mealType is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!preferences) {
+      console.error('Missing preferences in request');
+      return NextResponse.json(
+        { error: "preferences are required" },
+        { status: 400 }
+      );
+    }
+
+    // Normalize meal type to lowercase
+    const normalizedMealType = mealType.toLowerCase() as MealType;
+    console.log('API Request:', { normalizedMealType, preferences, useAI });
 
     try {
-      const meals = await getRandomMeals(mealType, preferences, 3, useAI);
+      const meals = await getRandomMeals(normalizedMealType, preferences, 3, useAI);
       console.log('Generated meals:', meals);
 
       if (!meals || meals.length === 0) {

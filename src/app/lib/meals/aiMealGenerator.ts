@@ -1,14 +1,12 @@
 import { HfInference } from '@huggingface/inference';
-import { Meal, MealType, Region, SpiceLevel, CookingMedium } from './types';
+import { Meal, MealType, Region, SpiceLevel, CookingMedium, FastingMeal } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 // Check if API key is available
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-if (!HUGGINGFACE_API_KEY) {
-  console.error('HUGGINGFACE_API_KEY is not set in environment variables');
-}
 
-const hf = new HfInference(HUGGINGFACE_API_KEY);
+// Initialize Hugging Face client if API key is available
+const hf = HUGGINGFACE_API_KEY ? new HfInference(HUGGINGFACE_API_KEY) : null;
 
 // Using a more reliable model for structured text generation
 const MODEL_NAME = "tiiuae/falcon-7b-instruct";
@@ -476,6 +474,113 @@ export const sampleMeals: Record<MealType, Meal[]> = {
   ]
 };
 
+export const sampleFastingMeals: FastingMeal[] = [
+  {
+    id: 'fast-1',
+    type: 'breakfast',
+    name: 'Ekadashi Fast',
+    fastingType: 'ekadashi',
+    description: 'Traditional Ekadashi fasting following Vedic customs',
+    allowedFoods: ['fruits', 'water', 'milk', 'nuts'],
+    duration: {
+      start: '00:00',
+      end: '24:00'
+    },
+    calories: 200,
+    protein: 5,
+    carbs: 25,
+    fat: 8,
+    healthTags: ['spiritual', 'detox', 'mindful-eating'],
+    benefits: [
+      'Spiritual cleansing',
+      'Digestive system rest',
+      'Mental clarity'
+    ],
+    isFasting: true,
+    region: 'north',
+    isVegetarian: true,
+    hasOnionGarlic: false
+  },
+  {
+    id: 'fast-2',
+    type: 'breakfast',
+    name: 'Fruit Fast',
+    fastingType: 'fruit-fast',
+    description: 'A gentle fast consisting of only fruits and fresh juices',
+    allowedFoods: ['all fruits', 'fresh juices', 'coconut water'],
+    duration: {
+      start: '06:00',
+      end: '18:00'
+    },
+    calories: 300,
+    protein: 3,
+    carbs: 40,
+    fat: 2,
+    healthTags: ['detox', 'antioxidant-rich', 'natural-sugars'],
+    benefits: [
+      'Digestive cleanse',
+      'Antioxidant boost',
+      'Natural hydration'
+    ],
+    isFasting: true,
+    region: 'south',
+    isVegetarian: true,
+    hasOnionGarlic: false
+  },
+  {
+    id: 'fast-3',
+    type: 'breakfast',
+    name: 'Navratri Fast',
+    fastingType: 'navratri',
+    description: 'Traditional Navratri fasting with specific allowed foods',
+    allowedFoods: ['kuttu atta', 'sabudana', 'potato', 'sendha namak'],
+    duration: {
+      start: '00:00',
+      end: '24:00'
+    },
+    calories: 400,
+    protein: 8,
+    carbs: 45,
+    fat: 12,
+    healthTags: ['spiritual', 'traditional', 'sattvic'],
+    benefits: [
+      'Spiritual connection',
+      'Body detoxification',
+      'Traditional wisdom'
+    ],
+    isFasting: true,
+    region: 'north',
+    isVegetarian: true,
+    hasOnionGarlic: false
+  },
+  {
+    id: 'fast-4',
+    type: 'breakfast',
+    name: 'Water Fast',
+    fastingType: 'water-fast',
+    description: 'Intermittent water fasting for detoxification',
+    allowedFoods: ['water', 'herbal tea'],
+    duration: {
+      start: '20:00',
+      end: '12:00'
+    },
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    healthTags: ['detox', 'autophagy', 'reset'],
+    benefits: [
+      'Cellular repair',
+      'Mental clarity',
+      'Digestive rest'
+    ],
+    isFasting: true,
+    region: 'west',
+    isVegetarian: true,
+    hasOnionGarlic: false
+  }
+];
+
 // Helper function to get a random sample meal that hasn't been used
 function getRandomSampleMeal(mealType: MealType, excludeNames: Set<string> = new Set()): Meal | null {
   const availableMeals = sampleMeals[mealType].filter(meal => !excludeNames.has(meal.name));
@@ -500,8 +605,8 @@ export async function generateMeal(
   excludeNames: Set<string> = new Set()
 ): Promise<Meal | null> {
   try {
-    if (!HUGGINGFACE_API_KEY) {
-      console.log('No Hugging Face API key found, using sample meals');
+    if (!HUGGINGFACE_API_KEY || !hf) {
+      console.log('No Hugging Face API key found or client not initialized, using sample meals');
       return getRandomSampleMeal(mealType, excludeNames);
     }
 
